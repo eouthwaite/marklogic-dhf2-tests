@@ -1,0 +1,5 @@
+{
+  "database-name": "%%stagingTestDb%%",
+  "schema-database": "%%mlSchemasDbName%%",
+  "triggers-database": "%%mlTriggersDbName%%"
+}

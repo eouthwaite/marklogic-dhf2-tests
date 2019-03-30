@@ -1,0 +1,16 @@
+{
+  "server-name": "%%stagingTestServerName%%",
+  "group-name": "Default",
+  "server-type": "http",
+  "enabled": true,
+  "root": "/",
+  "port": "%%stagingTestPort%%",
+  "file-log-level": "debug",
+  "log-errors": true,
+  "debug-allow": true,
+  "profile-allow": true,
+  "default-xquery-version": "1.0-ml",
+  "content-database": "%%stagingTestDb%%",
+  "modules-database": "%%mlModulesDbName%%",
+  "default-user": "nobody"
+}

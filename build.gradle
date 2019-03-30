@@ -1,0 +1,140 @@
+plugins {
+    id 'java'
+    id 'eclipse'
+    id 'idea'
+    id 'net.saliman.properties' version '1.4.6'
+    id 'com.marklogic.ml-data-hub' version '1.1.3'
+}
+
+apply plugin: "java"
+
+repositories {
+    jcenter()
+    maven {url 'http://developer.marklogic.com/maven2/'}
+}
+
+configurations {
+    mlcp
+}
+
+dependencies {
+    mlcp "com.marklogic:mlcp:9.0.7"
+    mlcp files("lib")
+    compile 'com.marklogic:marklogic-data-hub:1.1.3'
+    compile 'com.marklogic:marklogic-xcc:8.0.5'
+    mlRestApi "com.marklogic:marklogic-unit-test-modules:0.12.0"
+    testCompile "com.marklogic:marklogic-unit-test-client:0.12.0"
+}
+
+ext {
+    testingGroup = "Testing Group"
+
+    mlAppConfig {
+        customTokens.put("%%stagingTestDb%%", stagingTestDb);
+        customTokens.put("%%stagingTestServerName%%", stagingTestServerName);
+        customTokens.put("%%stagingTestPort%%", stagingTestPort);
+
+        customTokens.put("%%finalTestDb%%", finalTestDb);
+        customTokens.put("%%finalTestServerName%%", finalTestServerName);
+        customTokens.put("%%finalTestPort%%", finalTestPort);
+    }
+}
+
+
+
+
+
+task deployTestData(
+        type: ExtMlcpTask,
+        group: testingGroup
+) {
+    description 'Deploys the /src/test/ml-modules/root/test directory into the Modules DB without corrupting binaries.'
+    doFirst {
+        database = mlModulesDbName
+    }
+    classpath = configurations.mlcp
+    command = "IMPORT"
+    input_file_path = 'src/test/ml-modules/root/'
+    input_file_type = 'documents'
+    output_uri_replace = ".*/src/test/ml-modules/root,''"
+    args = ['-mode', 'local', '-thread_count', '8']
+}
+
+task copyTestDBConfig(type: Copy) {
+    description "copies unit test database config prior to deployment"
+    from "src/test/ml-config/databases"
+    include "*-test-database.json"
+    into file("user-config/databases/")
+}
+
+task copyTestEPConfig(type: Copy) {
+    description "copies unit test end point config prior to deployment"
+    from "src/test/ml-config/servers"
+    include "data-hub-*-test.json"
+    into file("user-config/servers/")
+}
+
+task copyUnitTestModules(type: Copy) {
+    description "copies unit test scaffolding files prior to deployment"
+    from "build/mlRestApi/marklogic-unit-test-modules/ml-modules/root"
+    into "src/test/ml-modules/root"
+}
+
+task removeTestDBConfig(type: Delete) {
+    description "removes unit test database config copied as part of deployment"
+    delete fileTree("user-config/databases").matching {
+        include "*-test-database.json"
+    }
+}
+
+task removeTestEPConfig(type: Delete) {
+    description "removes unit test end point config copied as part of deployment"
+    delete fileTree("user-config/servers").matching {
+        include "data-hub-*-test.json"
+    }
+}
+
+task removeMLUnitTest(type: Delete) {
+    description "removes unit test scaffolding files copied as part of deployment"
+    delete "src/test/ml-modules/root/test/css", "src/test/ml-modules/root/test/formats", "src/test/ml-modules/root/test/img", "src/test/ml-modules/root/test/js", "src/test/ml-modules/root/test/xslt",
+            "src/test/ml-modules/root/test/test-controller.xqy", "src/test/ml-modules/root/test/test-coverage.xqy", "src/test/ml-modules/root/test/default.xqy",
+            "src/test/ml-modules/root/test/test-helper.xqy"
+}
+
+// no need to copy the tests when deploying (MLCP used so that binary documents don't get broken)
+task deployTest(
+        dependsOn: [copyTestDBConfig, copyTestEPConfig, copyUnitTestModules, mlDeploy, deployTestData, removeMLUnitTest, removeTestDBConfig, removeTestEPConfig],
+        group: testingGroup
+) {
+    description 'Full deployment for testing environment - try deployTestData'
+    copyTestEPConfig.mustRunAfter copyTestDBConfig
+    copyUnitTestModules.mustRunAfter copyTestEPConfig
+    mlDeploy.mustRunAfter copyUnitTestModules
+    deployTestData.mustRunAfter mlDeploy
+    removeMLUnitTest.mustRunAfter deployTestData
+    removeTestDBConfig.mustRunAfter removeMLUnitTest
+    removeTestEPConfig.mustRunAfter removeTestDBConfig
+}
+
+// no need to copy the tests when deploying (MLCP used so that binary documents don't get broken)
+task reloadTest(
+        dependsOn: [copyUnitTestModules, mlReloadModules, deployTestData, removeMLUnitTest],
+        group: testingGroup
+) {
+    description 'clear modules DB and reload for testing environment'
+    mlReloadModules.mustRunAfter copyUnitTestModules
+    deployTestData.mustRunAfter mlReloadModules
+    removeMLUnitTest.mustRunAfter deployTestData
+}
+
+task myDeploy() {
+    description 'Full deployment for project'
+}
+
+if (environmentName in ["local", "test"]) {
+    println "\nDeploying tests: " + environmentName + " environment\n"
+    myDeploy.dependsOn deployTest
+} else {
+    println "\nNOT DEPLOYING TESTS!: " + environmentName + " environment\n"
+    myDeploy.dependsOn mlDeploy
+}

@@ -1,0 +1,17 @@
+{
+  "server-name": "%%finalTestServerName%%",
+  "group-name": "Default",
+  "server-type": "http",
+  "enabled": true,
+  "root": "/",
+  "port": "%%finalTestPort%%",
+  "file-log-level": "debug",
+  "log-errors": true,
+  "debug-allow": true,
+  "profile-allow": true,
+  "default-xquery-version": "1.0-ml",
+  "multi-version-concurrency-control": "contemporaneous",
+  "content-database": "%%finalTestDb%%",
+  "modules-database": "%%mlModulesDbName%%",
+  "default-user": "nobody"
+}
